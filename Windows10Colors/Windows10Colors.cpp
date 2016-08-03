@@ -250,32 +250,70 @@ static HRESULT GetSystemFrameColors (FrameColors& color)
     return S_OK;
 }
 
-static HRESULT GetAccentedFrameColors (FrameColors& color)
+namespace
 {
-    HRESULT hr;
-
-    bool useAccentColor = false;
+    // RAII-ish wrapper for HKEYs
+    class HKEYWrapper
     {
-        HKEY keyPersonalize;
+        HKEY key;
+        void Close ()
+        {
+            if (key)
+            {
+                RegCloseKey (key);
+                key = NULL;
+            }
+        }
+    public:
+        HKEYWrapper() : key (NULL) {}
+        ~HKEYWrapper () { Close (); }
+
+        operator HKEY const() { return key; }
+        HKEY* operator&() { return &key; }
+    };
+}
+
+// Returns whether title bars are colored with the accent color (Windows 10)
+static bool ColoredTitleBars ()
+{
+    // Key on Windows 10 version 1607
+    {
+        HKEYWrapper keyDWM;
+        LONG result = RegOpenKeyExW (HKEY_CURRENT_USER, L"SOFTWARE\\Microsoft\\Windows\\DWM",
+                                     0, KEY_READ, &keyDWM);
+        if (result == ERROR_SUCCESS)
+        {
+            DWORD prevalenceFlag = 0;
+            if (QueryFromDWORD (keyDWM, L"ColorPrevalence", prevalenceFlag) == ERROR_SUCCESS)
+                return prevalenceFlag != 0;
+        }
+    }
+    // Key on Windows 10 version 1511. After 1607 this is the start/taskbar colorization only
+    {
+        HKEYWrapper keyPersonalize;
         LONG result = RegOpenKeyExW (HKEY_CURRENT_USER, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
                                      0, KEY_READ, &keyPersonalize);
         if (result == ERROR_SUCCESS)
         {
             DWORD prevalenceFlag = 0;
             if (QueryFromDWORD (keyPersonalize, L"ColorPrevalence", prevalenceFlag) == ERROR_SUCCESS)
-                useAccentColor = prevalenceFlag != 0;
-            RegCloseKey (keyPersonalize);
+                return prevalenceFlag != 0;
         }
     }
+    return false;
+}
+
+static HRESULT GetAccentedFrameColors (FrameColors& color)
+{
+    HRESULT hr;
+
+    bool useAccentColor = ColoredTitleBars();
+    AccentColor ac;
+    hr = GetAccentColor (ac);
+    if (FAILED (hr)) return hr;
 
     if (useAccentColor)
     {
-        AccentColor ac;
-
-        // TODO: Check if accent color is even to be used
-        hr = GetAccentColor (ac);
-        if (FAILED (hr)) return hr;
-
         color.activeCaptionBG = ac.accent;
     }
     else
@@ -298,7 +336,7 @@ static HRESULT GetAccentedFrameColors (FrameColors& color)
     else
     {
         // Fallback
-        color.activeFrame = color.activeCaptionBG;
+        color.activeFrame = ac.accent;
     }
 
     color.inactiveCaptionBG = 0xffffffff;
