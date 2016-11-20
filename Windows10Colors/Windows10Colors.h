@@ -86,12 +86,17 @@ namespace windows10colors
 
     /**
      * Get colors used to paint window frames.
+     * \param color Receives frame color values.
+     * \param glassEffect Whether to compute colors for a window with an enabled
+     *  "sheet of glass" effect. This is the case if blur behind was enabled for
+     *  a window with a valid opaque client area (i.e. only positive margins passed to
+     *  DwmExtendFrameIntoClientArea).
      * \remarks Only produces sensible result on Windows 10.
      *  May return success on other platforms but return colors that don't match
      *  what the user sees.
      *  Check return value for success in any case.
      */
-    extern HRESULT GetFrameColors (FrameColors& color);
+    extern HRESULT GetFrameColors (FrameColors& color, bool glassEffect = false);
 } // namespace windows10colors
 
 #endif // __WINDOWS10COLORS_H__

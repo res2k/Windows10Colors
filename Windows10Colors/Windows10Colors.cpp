@@ -303,7 +303,7 @@ static bool ColoredTitleBars ()
     return false;
 }
 
-static HRESULT GetAccentedFrameColors (FrameColors& color)
+static HRESULT GetAccentedFrameColors (FrameColors& color, bool glassEffect)
 {
     HRESULT hr;
 
@@ -312,7 +312,13 @@ static HRESULT GetAccentedFrameColors (FrameColors& color)
     hr = GetAccentColor (ac);
     if (FAILED (hr)) return hr;
 
-    if (useAccentColor)
+    const RGBA glassFillColor = 0xffffffff; // Effective color; maybe "transparent" is more sensible?
+
+    if (glassEffect)
+    {
+        color.activeCaptionBG = glassFillColor;
+    }
+    else if (useAccentColor)
     {
         color.activeCaptionBG = ac.accent;
     }
@@ -324,19 +330,26 @@ static HRESULT GetAccentedFrameColors (FrameColors& color)
     bool textIsBright = (GetRValue (color.activeCaptionBG) * 2 + GetGValue (color.activeCaptionBG) * 5 + GetBValue (color.activeCaptionBG)) < 1024;
     color.activeCaptionText = textIsBright ? 0xffffffff : 0xff000000; // Colors seem static
 
-    DwmColors dwmColors;
-    if (SUCCEEDED (GetDwmColors (dwmColors)))
+    if (glassEffect)
     {
-        const RGBA activeFrameBaseColor = 0xffd9d9d9;
-        // Frame color is based on DWM colors, though those usually coincide or are based on the accent color
-        color.activeFrame = BlendRGBA (activeFrameBaseColor,
-                                        dwmColors.ColorizationColor | 0xff000000,
-                                        dwmColors.ColorizationColorBalance * 0.01f);
+        color.activeFrame = glassFillColor;
     }
     else
     {
-        // Fallback
-        color.activeFrame = ac.accent;
+        DwmColors dwmColors;
+        if (SUCCEEDED (GetDwmColors (dwmColors)))
+        {
+            const RGBA activeFrameBaseColor = 0xffd9d9d9;
+            // Frame color is based on DWM colors, though those usually coincide or are based on the accent color
+            color.activeFrame = BlendRGBA (activeFrameBaseColor,
+                                            dwmColors.ColorizationColor | 0xff000000,
+                                            dwmColors.ColorizationColorBalance * 0.01f);
+        }
+        else
+        {
+            // Fallback
+            color.activeFrame = ac.accent;
+        }
     }
 
     color.inactiveCaptionBG = 0xffffffff;
@@ -348,7 +361,7 @@ static HRESULT GetAccentedFrameColors (FrameColors& color)
     return S_OK;
 }
 
-HRESULT GetFrameColors (FrameColors& color)
+HRESULT GetFrameColors (FrameColors& color, bool glassEffect)
 {
     // High contrast colors -> use GetSysColors
     HIGHCONTRAST hc = { sizeof (HIGHCONTRAST) };
@@ -358,7 +371,7 @@ HRESULT GetFrameColors (FrameColors& color)
     if (use_sys_colors)
         return GetSystemFrameColors (color);
 
-    return GetAccentedFrameColors (color);
+    return GetAccentedFrameColors (color, glassEffect);
 }
 
 } // namespace windows10colors
