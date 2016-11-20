@@ -7,6 +7,8 @@
 #include <objidl.h>
 #include <gdiplus.h>
 
+#include <memory>
+
 #include "Windows10Colors.h"
 
 #define MAX_LOADSTRING 100
@@ -212,13 +214,37 @@ static RECT PaintMockWindow (HDC dc, int x, int y,
     static const int width = 100;
     static const int height = 100;
     static const int captionHeight = 24;
+    static const int blurInset = 8;
+    static const int blurRadius = 20;
+
+    Bitmap dropShadow (width + 2 * blurRadius, height + 2 * blurRadius, PixelFormat32bppARGB);
+    {
+        std::unique_ptr<Graphics> dropShadowGraphics (Graphics::FromImage (&dropShadow));
+        SolidBrush brush (Color (0, 0, 0));
+        Rect solidRect (blurRadius + blurInset, blurRadius + blurInset, width - 2*blurInset, height - 2*blurInset);
+        dropShadowGraphics->FillRectangle (&brush, solidRect);
+    }
+    {
+        BlurParams blurParams = { blurRadius, false };
+        Blur blur;
+        blur.SetParameters (&blurParams);
+        dropShadow.ApplyEffect (&blur, nullptr);
+    }
 
     Graphics g (dc);
-    Pen pen (RGBAtoGdiplus (frame));
-    g.DrawRectangle (&pen, x, y, width, height);
+    g.DrawImage (&dropShadow, x, y);
+    {
+        Rect frameRect = { x + blurRadius, y + blurRadius, width, height };
+        Color windowColor;
+        windowColor.SetFromCOLORREF (GetSysColor (COLOR_WINDOW));
+        SolidBrush fillBrush (windowColor);
+        g.FillRectangle (&fillBrush, frameRect);
+        Pen pen (RGBAtoGdiplus (frame));
+        g.DrawRectangle (&pen, frameRect);
+    }
 
     SolidBrush captionBrush (RGBAtoGdiplus (captionBG));
-    Rect captionRect (x + 1, y + 1, width - 2, captionHeight);
+    Rect captionRect (x + blurRadius + 1, y + blurRadius + 1, width - 2, captionHeight);
     g.FillRectangle (&captionBrush, captionRect.X, captionRect.Y, captionRect.Width+1, captionRect.Height+1);
 
     NONCLIENTMETRICS ncm = { sizeof (NONCLIENTMETRICS) };
@@ -231,7 +257,7 @@ static RECT PaintMockWindow (HDC dc, int x, int y,
     SolidBrush textBrush (RGBAtoGdiplus (captionText));
     g.DrawString (caption, -1, &captionFont, captionRect_f, &stringFmt, &textBrush);
 
-    return RECT{ x, y, x + width - 1, y + height - 1 };
+    return RECT{ x, y, x + width + 2*blurRadius - 1, y + height + 2*blurRadius - 1 };
 }
 
 static void PaintContents (HDC dc, const RECT& r)
