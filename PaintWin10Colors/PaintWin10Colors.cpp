@@ -21,11 +21,13 @@ WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 windows10colors::AccentColor accents;
 bool accents_valid = false;
 windows10colors::FrameColors colors;
+windows10colors::FrameColors colorsGlass;
 
 static void UpdateWindows10Colors ()
 {
     accents_valid = SUCCEEDED (windows10colors::GetAccentColor (accents));
     windows10colors::GetFrameColors (colors);
+    windows10colors::GetFrameColors (colorsGlass, true);
 }
 
 // Forward declarations of functions included in this code module:
@@ -207,12 +209,13 @@ static RECT PaintAccentColors (HDC dc, int x, int y)
 
 static RECT PaintMockWindow (HDC dc, int x, int y,
                              const wchar_t* caption,
-                             DWORD captionBG, DWORD captionText, DWORD frame)
+                             DWORD captionBG, DWORD captionText, DWORD frame,
+                             DWORD fill = 0)
 {
     using namespace Gdiplus;
 
-    static const int width = 100;
-    static const int height = 100;
+    static const int width = 200;
+    static const int height = 200;
     static const int captionHeight = 24;
     static const int blurInset = 8;
     static const int blurRadius = 20;
@@ -236,7 +239,10 @@ static RECT PaintMockWindow (HDC dc, int x, int y,
     {
         Rect frameRect = { x + blurRadius, y + blurRadius, width, height };
         Color windowColor;
-        windowColor.SetFromCOLORREF (GetSysColor (COLOR_WINDOW));
+        if (fill != 0)
+            windowColor = RGBAtoGdiplus (fill);
+        else
+            windowColor.SetFromCOLORREF (GetSysColor (COLOR_WINDOW));
         SolidBrush fillBrush (windowColor);
         g.FillRectangle (&fillBrush, frameRect);
         Pen pen (RGBAtoGdiplus (frame));
@@ -268,6 +274,12 @@ static void PaintContents (HDC dc, const RECT& r)
                                        colors.activeCaptionBG, colors.activeCaptionText, colors.activeFrame);
     PaintMockWindow (dc, activeRect.right + 16, activeRect.top, L"Inactive caption",
                      colors.inactiveCaptionBG, colors.inactiveCaptionText, colors.inactiveFrame);
+    PaintMockWindow (dc, activeRect.left, activeRect.bottom + 16, L"Active caption (glass)",
+                     colorsGlass.activeCaptionBG, colorsGlass.activeCaptionText, colorsGlass.activeFrame,
+                     colorsGlass.activeCaptionBG);
+    PaintMockWindow (dc, activeRect.right + 16, activeRect.bottom + 16, L"Inactive caption (glass)",
+                     colorsGlass.inactiveCaptionBG, colorsGlass.inactiveCaptionText, colorsGlass.inactiveFrame,
+                     colorsGlass.inactiveCaptionBG);
 }
 
 //
