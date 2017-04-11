@@ -331,7 +331,7 @@ static HRESULT GetAccentedFrameColors (FrameColors& color, bool glassEffect)
         color.activeCaptionBG = 0xffffffff;
     }
     // Found by trial and error
-    bool textIsBright = (GetRValue (color.activeCaptionBG) * 2 + GetGValue (color.activeCaptionBG) * 5 + GetBValue (color.activeCaptionBG)) < 1024;
+    bool textIsBright = (GetRValue (color.activeCaptionBG) * 2 + GetGValue (color.activeCaptionBG) * 5 + GetBValue (color.activeCaptionBG)) <= 1024;
     color.activeCaptionText = textIsBright ? 0xffffffff : 0xff000000; // Colors seem static
 
     if (glassEffect)
