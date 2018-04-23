@@ -101,6 +101,17 @@ namespace windows10colors
      *  Check return value for success in any case.
      */
     extern HRESULT GetFrameColors (FrameColors& color, bool glassEffect = false);
+
+    /**
+     * Returns whether some color is 'dark' for the purpose of finding a contrasting
+     * color - e.g. given some background color, use the 'dark' property to choose
+     * an appropriate text (foreground) color.
+     * Formula matches the one in https://docs.microsoft.com/en-us/windows/uwp/design/style/color
+     */
+    static inline bool IsColorDark (RGBA color)
+    {
+      return (GetRValue (color) * 2 + GetGValue (color) * 5 + GetBValue (color)) <= 1024;
+    }
 } // namespace windows10colors
 
 #endif // __WINDOWS10COLORS_H__

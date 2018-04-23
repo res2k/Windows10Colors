@@ -331,7 +331,7 @@ static HRESULT GetAccentedFrameColors (FrameColors& color, bool glassEffect)
         color.activeCaptionBG = 0xffffffff;
     }
     // Formula is documented here: https://docs.microsoft.com/en-us/windows/uwp/design/style/color
-    bool textIsBright = (GetRValue (color.activeCaptionBG) * 2 + GetGValue (color.activeCaptionBG) * 5 + GetBValue (color.activeCaptionBG)) <= 1024;
+    bool textIsBright = IsColorDark (color.activeCaptionBG);
     color.activeCaptionText = textIsBright ? 0xffffffff : 0xff000000; // Colors seem static
 
     if (glassEffect)
