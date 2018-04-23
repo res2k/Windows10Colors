@@ -26,9 +26,18 @@ https://github.com/res2k/Windows10Colors
 #include "Windows10Colors.h"
 
 #include <comdef.h>
+#include <Dwmapi.h>
+#include <winnt.h>
 #include <wrl.h>
 
 #include <windows.ui.viewmanagement.h>
+
+#if defined(_MSC_VER)
+#pragma comment(lib, "dwmapi.lib")
+#pragma comment(lib, "ntdll.lib")
+#endif
+
+extern "C" NTSYSAPI NTSTATUS NTAPI RtlVerifyVersionInfo (PRTL_OSVERSIONINFOEXW VersionInfo, ULONG TypeMask, ULONGLONG ConditionMask);
 
 namespace windows10colors
 {
@@ -41,6 +50,16 @@ using namespace Microsoft::WRL;
 
 namespace
 {
+    /// IsWindows8OrGreater() implementation using RtlVerifyVersionInfo
+    static bool IsWindows8OrGreater ()
+    {
+      RTL_OSVERSIONINFOEXW version = { sizeof (RTL_OSVERSIONINFOEXW), 6, 2 };
+      ULONGLONG conditionMask = 0;
+      VER_SET_CONDITION (conditionMask, VER_MAJORVERSION, VER_GREATER_EQUAL);
+      VER_SET_CONDITION (conditionMask, VER_MINORVERSION, VER_GREATER_EQUAL);
+      return RtlVerifyVersionInfo (&version, VER_MAJORVERSION | VER_MINORVERSION, conditionMask) == 0;
+    }
+
     /// Wrapper for the few WinRT functions we need to use
     class WinRT
     {
@@ -204,11 +223,20 @@ static LONG QueryFromDWORD (HKEY key, const wchar_t* value, T& dest)
    Although there's also an API to get these, it's undocumented as well... */
 static HRESULT GetDwmColors (DwmColors& colors)
 {
+    HRESULT hr;
+    if (!IsWindows8OrGreater ())
+    {
+        BOOL dwmEnabled;
+        hr = DwmIsCompositionEnabled (&dwmEnabled);
+        if (SUCCEEDED (hr) && !dwmEnabled)
+            return E_FAIL;
+    }
+
     HKEY keyDWM;
     LONG result = RegOpenKeyExW (HKEY_CURRENT_USER, L"SOFTWARE\\Microsoft\\Windows\\DWM", 0, KEY_READ, &keyDWM);
     if (result != ERROR_SUCCESS) return HRESULT_FROM_WIN32 (result);
 
-    HRESULT hr = S_OK;
+    hr = S_OK;
     DWORD c;
     result = QueryFromDWORD (keyDWM, L"ColorizationColor", c);
     if (result == ERROR_SUCCESS)
