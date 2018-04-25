@@ -23,6 +23,8 @@ Original source:
 https://github.com/res2k/Windows10Colors
 
 */
+
+#define NOMINMAX
 #include "Windows10Colors.h"
 
 #include <comdef.h>
@@ -31,6 +33,8 @@ https://github.com/res2k/Windows10Colors
 #include <wrl.h>
 
 #include <windows.ui.viewmanagement.h>
+
+#include <algorithm>
 
 #if defined(_MSC_VER)
 #pragma comment(lib, "dwmapi.lib")
@@ -54,6 +58,16 @@ namespace
     static bool IsWindows8OrGreater ()
     {
       RTL_OSVERSIONINFOEXW version = { sizeof (RTL_OSVERSIONINFOEXW), 6, 2 };
+      ULONGLONG conditionMask = 0;
+      VER_SET_CONDITION (conditionMask, VER_MAJORVERSION, VER_GREATER_EQUAL);
+      VER_SET_CONDITION (conditionMask, VER_MINORVERSION, VER_GREATER_EQUAL);
+      return RtlVerifyVersionInfo (&version, VER_MAJORVERSION | VER_MINORVERSION, conditionMask) == 0;
+    }
+
+    /// IsWindows8OrGreater() implementation using RtlVerifyVersionInfo
+    static bool IsWindows10OrGreater ()
+    {
+      RTL_OSVERSIONINFOEXW version = { sizeof (RTL_OSVERSIONINFOEXW), 10, 0 };
       ULONGLONG conditionMask = 0;
       VER_SET_CONDITION (conditionMask, VER_MAJORVERSION, VER_GREATER_EQUAL);
       VER_SET_CONDITION (conditionMask, VER_MINORVERSION, VER_GREATER_EQUAL);
@@ -165,7 +179,7 @@ static inline RGBA ToRGBA (WindowsUI::Color color)
     return RGB (color.R, color.G, color.B) | ((color.A) << 24);
 }
 
-HRESULT GetAccentColor (AccentColor& color)
+static HRESULT GetAccentColor_win10 (AccentColor& color)
 {
     HStringRef classId;
     CHECKED(classId.Set (L"Windows.UI.ViewManagement.UISettings"));
@@ -257,6 +271,185 @@ static HRESULT GetDwmColors (DwmColors& colors)
     return hr;
 }
 
+static bool IsHighContrast ()
+{
+    HIGHCONTRAST hc = { sizeof (HIGHCONTRAST) };
+    return SystemParametersInfo (SPI_GETHIGHCONTRAST, sizeof (HIGHCONTRAST), &hc, 0)
+        && ((hc.dwFlags & HCF_HIGHCONTRASTON) != 0);
+}
+
+namespace
+{
+    // HSV color space helper functions
+    struct HSV
+    {
+        int H, S, V;
+    };
+
+    static HSV RGBtoHSV (RGBA color)
+    {
+        HSV result;
+
+        // Compute color as HSV. Use range [0..0x8000]
+        int R = (GetRValue (color) * 0x8000) / 255;
+        int G = (GetGValue (color) * 0x8000) / 255;
+        int B = (GetBValue (color) * 0x8000) / 255;
+        int maxComp = std::max (R, std::max (G, B));
+        int minComp = std::min (R, std::min (G, B));
+        int minMaxDiff = maxComp - minComp;
+        result.H = 0;
+        if (minMaxDiff != 0)
+        {
+            if (maxComp == R)
+            {
+                result.H = (((G - B) * 0x8000) / minMaxDiff);
+                if (result.H < 0) result.H += (6 * 0x8000);
+            }
+            else if (maxComp == G)
+            {
+                result.H = (((B - R) * 0x8000) / minMaxDiff) + (2 * 0x8000);
+            }
+            else
+            {
+                result.H = (((R - G) * 0x8000) / minMaxDiff) + (4 * 0x8000);
+            }
+        }
+        result.V = maxComp;
+        result.S = result.V != 0 ? (minMaxDiff * 0x8000) / result.V : 0;
+        return result;
+    }
+
+    static HSV Lighter (const HSV& prev, const HSV& base)
+    {
+        HSV result = prev;
+
+        // Shade: 25% of V
+        // If V >= 70%, reduce sat to 75% rel
+        int Vstep = base.V / 4;
+
+        result.V = std::min (prev.V + Vstep, 0x8000);
+        result.S = (result.V >= 22937) ? ((prev.S * 192) >> 8) : prev.S;
+        return result;
+    }
+
+    static HSV Darker (const HSV& prev, const HSV& base)
+    {
+        HSV result = prev;
+
+        // Shade: 25% of V
+        int Vstep = base.V / 4;
+
+        result.V = std::max (prev.V - Vstep, 0);
+        return result;
+    }
+
+    static RGBA HSVtoRGB (const HSV& color, unsigned int alpha)
+    {
+        int R, G, B;
+        int chroma = (color.V * color.S) / 0x8000;
+        int second = (chroma * (0x8000 - abs (int (color.H % (2 * 0x8000) - 0x8000)))) / 0x8000;
+        switch (color.H / 0x8000)
+        {
+        case 0:
+            R = chroma;
+            G = second;
+            B = 0;
+            break;
+        case 1:
+            R = second;
+            G = chroma;
+            B = 0;
+            break;
+        case 2:
+            R = 0;
+            G = chroma;
+            B = second;
+            break;
+        case 3:
+            R = 0;
+            G = second;
+            B = chroma;
+            break;
+        case 4:
+            R = second;
+            G = 0;
+            B = chroma;
+            break;
+        case 5:
+            R = chroma;
+            G = 0;
+            B = second;
+            break;
+        }
+        int minComp = color.V - chroma;
+        return RGB (std::min (((R + minComp) * 255) / 0x8000, 255),
+                    std::min (((G + minComp) * 255) / 0x8000, 255),
+                    std::min (((B + minComp) * 255) / 0x8000, 255)) | (alpha << 24);
+    }
+}
+
+static void GenerateAccentColors (RGBA base, AccentColor& color)
+{
+    color.accent = base;
+
+    // Compute shades
+    HSV colorHSV = RGBtoHSV (base);
+
+    HSV light = Lighter (colorHSV, colorHSV);
+    color.light = HSVtoRGB (light, (base >> 24) & 0xff);
+    light = Lighter (light, colorHSV);
+    color.lighter = HSVtoRGB (light, (base >> 24) & 0xff);
+    light = Lighter (light, colorHSV);
+    color.lightest = HSVtoRGB (light, (base >> 24) & 0xff);
+
+    HSV dark = Darker (colorHSV, colorHSV);
+    color.dark = HSVtoRGB (dark, (base >> 24) & 0xff);
+    dark = Darker (dark, colorHSV);
+    color.darker = HSVtoRGB (dark, (base >> 24) & 0xff);
+    dark = Darker (dark, colorHSV);
+    color.darkest = HSVtoRGB (dark, (base >> 24) & 0xff);
+}
+
+static HRESULT GetAccentColor (AccentColor& color, bool highContrast)
+{
+    HRESULT hr;
+    hr = GetAccentColor_win10 (color);
+    if (SUCCEEDED (hr)) return hr;
+
+    if (!highContrast)
+    {
+        DwmColors dwmColor;
+        hr = GetDwmColors (dwmColor);
+        if (SUCCEEDED (hr))
+        {
+            GenerateAccentColors (dwmColor.ColorizationColor, color);
+            return S_ACCENT_COLOR_GUESSED;
+        }
+    }
+
+    if (highContrast)
+    {
+        // Windows 10 High Contrast mode uses the same color for all shades
+        color.accent =
+        color.light =
+        color.lighter =
+        color.lightest =
+        color.dark =
+        color.darker =
+        color.darkest = GetSysColor (COLOR_HIGHLIGHT) | 0xff000000;
+    }
+    else
+    {
+        GenerateAccentColors (GetSysColor (COLOR_ACTIVECAPTION) | 0xff000000, color);
+    }
+    return S_ACCENT_COLOR_GUESSED;
+}
+
+HRESULT GetAccentColor (AccentColor& color)
+{
+    return GetAccentColor (color, IsHighContrast ());
+}
+
 static RGBA BlendRGBA (RGBA a, RGBA b, float f)
 {
     float a_factor = 1.f - f;
@@ -339,28 +532,33 @@ static HRESULT GetAccentedFrameColors (FrameColors& color, bool glassEffect)
 {
     HRESULT hr;
 
-    bool useAccentColor = ColoredTitleBars();
+    bool useAccentColor = !IsWindows10OrGreater() || ColoredTitleBars();
     AccentColor ac;
-    hr = GetAccentColor (ac);
+    hr = GetAccentColor (ac, false);
     if (FAILED (hr)) return hr;
 
-    const RGBA glassFillColor = 0xffffffff; // Effective color; maybe "transparent" is more sensible?
+    const RGBA glassFillColor = 0x00000000;
 
     if (glassEffect)
     {
         color.activeCaptionBG = glassFillColor;
-    }
-    else if (useAccentColor)
-    {
-        color.activeCaptionBG = ac.accent;
+        bool textIsBright = !IsWindows10OrGreater() && IsColorDark (ac.accent);
+        color.activeCaptionText = textIsBright ? 0xffffffff : 0xff000000; // Colors seem static
     }
     else
     {
-        color.activeCaptionBG = 0xffffffff;
+        if (useAccentColor)
+        {
+          color.activeCaptionBG = ac.accent;
+        }
+        else
+        {
+          color.activeCaptionBG = 0xffffffff;
+        }
+        // Formula is documented here: https://docs.microsoft.com/en-us/windows/uwp/design/style/color
+        bool textIsBright = IsColorDark (color.activeCaptionBG);
+        color.activeCaptionText = textIsBright ? 0xffffffff : 0xff000000; // Colors seem static
     }
-    // Formula is documented here: https://docs.microsoft.com/en-us/windows/uwp/design/style/color
-    bool textIsBright = IsColorDark (color.activeCaptionBG);
-    color.activeCaptionText = textIsBright ? 0xffffffff : 0xff000000; // Colors seem static
 
     if (glassEffect)
     {
@@ -396,14 +594,15 @@ static HRESULT GetAccentedFrameColors (FrameColors& color, bool glassEffect)
 HRESULT GetFrameColors (FrameColors& color, bool glassEffect)
 {
     // High contrast colors -> use GetSysColors
-    HIGHCONTRAST hc = { sizeof (HIGHCONTRAST) };
-    bool use_sys_colors = SystemParametersInfo (SPI_GETHIGHCONTRAST, sizeof (HIGHCONTRAST), &hc, 0)
-        && ((hc.dwFlags & HCF_HIGHCONTRASTON) != 0);
+    bool use_sys_colors = IsHighContrast ();
 
-    if (use_sys_colors)
-        return GetSystemFrameColors (color);
+    if (!use_sys_colors)
+    {
+        HRESULT hr = GetAccentedFrameColors (color, glassEffect);
+        if (SUCCEEDED (hr)) return hr;
+    }
 
-    return GetAccentedFrameColors (color, glassEffect);
+    return GetSystemFrameColors (color);
 }
 
 } // namespace windows10colors

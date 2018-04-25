@@ -34,6 +34,8 @@ https://github.com/res2k/Windows10Colors
 
 namespace windows10colors
 {
+    static const HRESULT S_ACCENT_COLOR_GUESSED = MAKE_HRESULT (0, 0x457, 0xC);
+
     /**
      * RGBA color. Red is in the LSB, Alpha in the MSB.
      * You can use GetRValue() et al to access individual components.
@@ -61,7 +63,8 @@ namespace windows10colors
 
     /**
      * Return current accent color.
-     * \remarks Only works on Windows 10. Check return value for success in any case.
+     * \remarks On platforms other than Windows 10 tries to guess an appropriate
+     *   color. Returns \c S_ACCENT_COLOR_GUESSED in that case.
      */
     extern HRESULT GetAccentColor (AccentColor& color);
 
@@ -95,10 +98,8 @@ namespace windows10colors
      *  "sheet of glass" effect. This is the case if blur behind was enabled for
      *  a window with a valid opaque client area (i.e. only positive margins passed to
      *  DwmExtendFrameIntoClientArea).
-     * \remarks Only produces sensible result on Windows 10.
-     *  May return success on other platforms but return colors that don't match
-     *  what the user sees.
-     *  Check return value for success in any case.
+     * \remarks On platforms other than Windows 10 tries to guess appropriate
+     *   colors. Returns \c S_ACCENT_COLOR_GUESSED in that case.
      */
     extern HRESULT GetFrameColors (FrameColors& color, bool glassEffect = false);
 
