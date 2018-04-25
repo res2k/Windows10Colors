@@ -422,21 +422,31 @@ static RGBA BlendRGBA (RGBA a, RGBA b, float f)
     | (static_cast<int> (alpha_a* a_factor + alpha_b*b_factor) << 24);
 }
 
-static HRESULT GetAccentColor (AccentColor& color, bool highContrast)
+static HRESULT GetAccentColor_dwm (RGBA& color)
+{
+    DwmColors dwmColor;
+    HRESULT hr = GetDwmColors (dwmColor);
+    if (FAILED (hr)) return hr;
+
+    color =
+        BlendRGBA (0xffffffff, dwmColor.ColorizationColor | 0xff000000,
+                    (dwmColor.ColorizationColor >> 24) / 255.0f);
+    return S_OK;
+}
+
+HRESULT GetAccentColor (AccentColor& color)
 {
     HRESULT hr;
     hr = GetAccentColor_win10 (color);
     if (SUCCEEDED (hr)) return hr;
 
-    if (!highContrast)
+    bool highContrast = IsHighContrast ();
+    if (highContrast)
     {
-        DwmColors dwmColor;
-        hr = GetDwmColors (dwmColor);
+        RGBA colorizationComposed;
+        hr = GetAccentColor_dwm (colorizationComposed);
         if (SUCCEEDED (hr))
         {
-            RGBA colorizationComposed =
-                BlendRGBA (0xffffffff, dwmColor.ColorizationColor | 0xff000000,
-                           (dwmColor.ColorizationColor >> 24) / 255.0f);
             GenerateAccentColors (colorizationComposed, color);
             return S_ACCENT_COLOR_GUESSED;
         }
@@ -458,11 +468,6 @@ static HRESULT GetAccentColor (AccentColor& color, bool highContrast)
         GenerateAccentColors (GetSysColor (COLOR_ACTIVECAPTION) | 0xff000000, color);
     }
     return S_ACCENT_COLOR_GUESSED;
-}
-
-HRESULT GetAccentColor (AccentColor& color)
-{
-    return GetAccentColor (color, IsHighContrast ());
 }
 
 static HRESULT GetSystemFrameColors (FrameColors& color)
@@ -531,6 +536,28 @@ static bool ColoredTitleBars ()
     return false;
 }
 
+// Only obtain accent color - doesn't compute shades if using fallback
+static HRESULT GetAccentColorOnly (RGBA& color)
+{
+    AccentColor ac;
+    HRESULT hr;
+    hr = GetAccentColor_win10 (ac);
+    if (SUCCEEDED (hr))
+    {
+        color = ac.accent;
+        return hr;
+    }
+
+    hr = GetAccentColor_dwm (color);
+    if (SUCCEEDED (hr))
+    {
+        return S_ACCENT_COLOR_GUESSED;
+    }
+
+    color = GetSysColor (COLOR_ACTIVECAPTION);
+    return S_ACCENT_COLOR_GUESSED;
+}
+
 static HRESULT GetAccentedFrameColors (FrameColors& color, unsigned int options)
 {
     HRESULT hr;
@@ -539,13 +566,13 @@ static HRESULT GetAccentedFrameColors (FrameColors& color, unsigned int options)
     bool glassEffect = (options & fcGlassEffect) != 0;
     bool useAccentColor = !isWin10 || ((options & fcTitleBarsColored) != 0)
         || (!glassEffect && ColoredTitleBars());
-    AccentColor ac;
-    hr = GetAccentColor (ac, false);
+    RGBA accent;
+    hr = GetAccentColorOnly (accent);
     if (FAILED (hr)) return hr;
 
     if (useAccentColor)
     {
-        color.activeCaptionBG = ac.accent;
+        color.activeCaptionBG = accent;
     }
     else
     {
@@ -574,7 +601,7 @@ static HRESULT GetAccentedFrameColors (FrameColors& color, unsigned int options)
         else
         {
             // Fallback
-            color.activeFrame = ac.accent;
+            color.activeFrame = accent;
         }
     }
 
