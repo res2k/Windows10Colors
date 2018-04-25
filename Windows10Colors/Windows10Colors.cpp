@@ -410,6 +410,18 @@ static void GenerateAccentColors (RGBA base, AccentColor& color)
     color.darkest = HSVtoRGB (dark, (base >> 24) & 0xff);
 }
 
+static RGBA BlendRGBA (RGBA a, RGBA b, float f)
+{
+  float a_factor = 1.f - f;
+  float b_factor = f;
+  BYTE alpha_a = (a >> 24) & 0xff;
+  BYTE alpha_b = (b >> 24) & 0xff;
+  return RGB (static_cast<int> (GetRValue (a)* a_factor + GetRValue (b)*b_factor),
+              static_cast<int> (GetGValue (a)* a_factor + GetGValue (b)*b_factor),
+              static_cast<int> (GetBValue (a)* a_factor + GetBValue (b)*b_factor))
+    | (static_cast<int> (alpha_a* a_factor + alpha_b*b_factor) << 24);
+}
+
 static HRESULT GetAccentColor (AccentColor& color, bool highContrast)
 {
     HRESULT hr;
@@ -422,7 +434,10 @@ static HRESULT GetAccentColor (AccentColor& color, bool highContrast)
         hr = GetDwmColors (dwmColor);
         if (SUCCEEDED (hr))
         {
-            GenerateAccentColors (dwmColor.ColorizationColor, color);
+            RGBA colorizationComposed =
+                BlendRGBA (0xffffffff, dwmColor.ColorizationColor | 0xff000000,
+                           (dwmColor.ColorizationColor >> 24) / 255.0f);
+            GenerateAccentColors (colorizationComposed, color);
             return S_ACCENT_COLOR_GUESSED;
         }
     }
@@ -448,18 +463,6 @@ static HRESULT GetAccentColor (AccentColor& color, bool highContrast)
 HRESULT GetAccentColor (AccentColor& color)
 {
     return GetAccentColor (color, IsHighContrast ());
-}
-
-static RGBA BlendRGBA (RGBA a, RGBA b, float f)
-{
-    float a_factor = 1.f - f;
-    float b_factor = f;
-    BYTE alpha_a = (a >> 24) & 0xff;
-    BYTE alpha_b = (b >> 24) & 0xff;
-    return RGB (static_cast<int> (GetRValue (a)* a_factor + GetRValue (b)*b_factor),
-                static_cast<int> (GetGValue (a)* a_factor + GetGValue (b)*b_factor),
-                static_cast<int> (GetBValue (a)* a_factor + GetBValue (b)*b_factor))
-        | (static_cast<int> (alpha_a* a_factor + alpha_b*b_factor) << 24);
 }
 
 static HRESULT GetSystemFrameColors (FrameColors& color)
