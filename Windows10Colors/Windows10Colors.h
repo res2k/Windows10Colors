@@ -98,8 +98,7 @@ namespace windows10colors
          * Whether to compute colors for a window with an enabled "sheet of glass" effect.
          * This is the case if blur behind was enabled for a window with a valid opaque
          * client area (i.e. only positive margins passed to DwmExtendFrameIntoClientArea).
-         * The caption background will be a transparent color, but the caption text color
-         * will be contrasting.
+         * The resulting colors will emulate a "composed" appearance.
          */
         fcGlassEffect = 1,
         /**

@@ -535,39 +535,30 @@ static HRESULT GetAccentedFrameColors (FrameColors& color, unsigned int options)
 {
     HRESULT hr;
 
+    bool isWin10 = IsWindows10OrGreater ();
     bool glassEffect = (options & fcGlassEffect) != 0;
-    bool useAccentColor = !IsWindows10OrGreater() || ((options & fcTitleBarsColored) != 0)
-        || ColoredTitleBars();
+    bool useAccentColor = !isWin10 || ((options & fcTitleBarsColored) != 0)
+        || (!glassEffect && ColoredTitleBars());
     AccentColor ac;
     hr = GetAccentColor (ac, false);
     if (FAILED (hr)) return hr;
 
-    const RGBA glassFillColor = 0x00000000;
-
-    if (glassEffect)
+    if (useAccentColor)
     {
-        color.activeCaptionBG = glassFillColor;
-        bool textIsBright = !IsWindows10OrGreater() && IsColorDark (ac.accent);
-        color.activeCaptionText = textIsBright ? 0xffffffff : 0xff000000; // Colors seem static
+        color.activeCaptionBG = ac.accent;
     }
     else
     {
-        if (useAccentColor)
-        {
-          color.activeCaptionBG = ac.accent;
-        }
-        else
-        {
-          color.activeCaptionBG = 0xffffffff;
-        }
-        // Formula is documented here: https://docs.microsoft.com/en-us/windows/uwp/design/style/color
-        bool textIsBright = IsColorDark (color.activeCaptionBG);
-        color.activeCaptionText = textIsBright ? 0xffffffff : 0xff000000; // Colors seem static
+        color.activeCaptionBG = 0xffffffff;
     }
+
+    // Formula is documented here: https://docs.microsoft.com/en-us/windows/uwp/design/style/color
+    bool textIsBright = IsColorDark (color.activeCaptionBG);
+    color.activeCaptionText = textIsBright ? 0xffffffff : 0xff000000; // Colors seem static
 
     if (glassEffect)
     {
-        color.activeFrame = glassFillColor;
+        color.activeFrame = color.activeCaptionBG;
     }
     else
     {
@@ -587,7 +578,7 @@ static HRESULT GetAccentedFrameColors (FrameColors& color, unsigned int options)
         }
     }
 
-    color.inactiveCaptionBG = glassEffect ? glassFillColor : 0xffffffff;
+    color.inactiveCaptionBG = 0xffffffff;
     RGBA rawInactiveCaptionText = 0xff000000;
     // inactive frame: Probably a 0.5 blend of 0xffaaaaaa and 0. Maybe 0xffaaaaaa is itself a blend.
     color.inactiveFrame = 0x7f565656;
