@@ -27,7 +27,7 @@ static void UpdateWindows10Colors ()
 {
     accents_valid = SUCCEEDED (windows10colors::GetAccentColor (accents));
     windows10colors::GetFrameColors (colors);
-    windows10colors::GetFrameColors (colorsGlass, true);
+    windows10colors::GetFrameColors (colorsGlass, windows10colors::fcGlassEffect);
 }
 
 // Forward declarations of functions included in this code module:

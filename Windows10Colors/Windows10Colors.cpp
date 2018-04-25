@@ -528,11 +528,13 @@ static bool ColoredTitleBars ()
     return false;
 }
 
-static HRESULT GetAccentedFrameColors (FrameColors& color, bool glassEffect)
+static HRESULT GetAccentedFrameColors (FrameColors& color, unsigned int options)
 {
     HRESULT hr;
 
-    bool useAccentColor = !IsWindows10OrGreater() || ColoredTitleBars();
+    bool glassEffect = (options & fcGlassEffect) != 0;
+    bool useAccentColor = !IsWindows10OrGreater() || ((options & fcTitleBarsColored) != 0)
+        || ColoredTitleBars();
     AccentColor ac;
     hr = GetAccentColor (ac, false);
     if (FAILED (hr)) return hr;
@@ -582,7 +584,7 @@ static HRESULT GetAccentedFrameColors (FrameColors& color, bool glassEffect)
         }
     }
 
-    color.inactiveCaptionBG = 0xffffffff;
+    color.inactiveCaptionBG = glassEffect ? glassFillColor : 0xffffffff;
     RGBA rawInactiveCaptionText = 0xff000000;
     // inactive frame: Probably a 0.5 blend of 0xffaaaaaa and 0. Maybe 0xffaaaaaa is itself a blend.
     color.inactiveFrame = 0x7f565656;
@@ -591,14 +593,14 @@ static HRESULT GetAccentedFrameColors (FrameColors& color, bool glassEffect)
     return S_OK;
 }
 
-HRESULT GetFrameColors (FrameColors& color, bool glassEffect)
+HRESULT GetFrameColors (FrameColors& color, unsigned int options)
 {
     // High contrast colors -> use GetSysColors
     bool use_sys_colors = IsHighContrast ();
 
     if (!use_sys_colors)
     {
-        HRESULT hr = GetAccentedFrameColors (color, glassEffect);
+        HRESULT hr = GetAccentedFrameColors (color, options);
         if (SUCCEEDED (hr)) return hr;
     }
 

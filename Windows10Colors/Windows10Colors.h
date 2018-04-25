@@ -91,17 +91,32 @@ namespace windows10colors
         RGBA inactiveFrame;
     };
 
+    /// Frame color options
+    enum FrameColorOption
+    {
+        /**
+         * Whether to compute colors for a window with an enabled "sheet of glass" effect.
+         * This is the case if blur behind was enabled for a window with a valid opaque
+         * client area (i.e. only positive margins passed to DwmExtendFrameIntoClientArea).
+         * The caption background will be a transparent color, but the caption text color
+         * will be contrasting.
+         */
+        fcGlassEffect = 1,
+        /**
+         * Always compute title bar colors as if they were colored.
+         * Otherwise uses current system setting.
+         */
+        fcTitleBarsColored = 2
+    };
+
     /**
      * Get colors used to paint window frames.
      * \param color Receives frame color values.
-     * \param glassEffect Whether to compute colors for a window with an enabled
-     *  "sheet of glass" effect. This is the case if blur behind was enabled for
-     *  a window with a valid opaque client area (i.e. only positive margins passed to
-     *  DwmExtendFrameIntoClientArea).
+     * \param options Frame color options. Combination of FrameColorOption values.
      * \remarks On platforms other than Windows 10 tries to guess appropriate
      *   colors. Returns \c S_ACCENT_COLOR_GUESSED in that case.
      */
-    extern HRESULT GetFrameColors (FrameColors& color, bool glassEffect = false);
+    extern HRESULT GetFrameColors (FrameColors& color, unsigned int options = 0);
 
     /**
      * Returns whether some color is 'dark' for the purpose of finding a contrasting
