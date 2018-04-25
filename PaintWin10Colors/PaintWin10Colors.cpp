@@ -223,7 +223,9 @@ static RECT PaintMockWindow (HDC dc, int x, int y,
     Bitmap dropShadow (width + 2 * blurRadius, height + 2 * blurRadius, PixelFormat32bppARGB);
     {
         std::unique_ptr<Graphics> dropShadowGraphics (Graphics::FromImage (&dropShadow));
-        SolidBrush brush (Color (0, 0, 0));
+        Color shadowColor;
+        shadowColor.SetFromCOLORREF (GetSysColor (COLOR_WINDOWTEXT));
+        SolidBrush brush (shadowColor);
         Rect solidRect (blurRadius + blurInset, blurRadius + blurInset, width - 2*blurInset, height - 2*blurInset);
         dropShadowGraphics->FillRectangle (&brush, solidRect);
     }
