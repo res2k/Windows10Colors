@@ -440,7 +440,7 @@ HRESULT GetAccentColor (AccentColor& color)
     if (SUCCEEDED (hr)) return hr;
 
     bool highContrast = IsHighContrast ();
-    if (highContrast)
+    if (!highContrast)
     {
         RGBA colorizationComposed;
         hr = GetAccentColor_dwm (colorizationComposed);
