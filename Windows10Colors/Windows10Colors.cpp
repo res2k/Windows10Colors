@@ -41,8 +41,6 @@ https://github.com/res2k/Windows10Colors
 #pragma comment(lib, "ntdll.lib")
 #endif
 
-extern "C" NTSYSAPI NTSTATUS NTAPI RtlVerifyVersionInfo (PRTL_OSVERSIONINFOEXW VersionInfo, ULONG TypeMask, ULONGLONG ConditionMask);
-
 namespace windows10colors
 {
 
@@ -54,6 +52,10 @@ using namespace Microsoft::WRL;
 
 namespace
 {
+    extern "C" NTSYSAPI NTSTATUS NTAPI RtlVerifyVersionInfo (PRTL_OSVERSIONINFOEXW VersionInfo,
+                                                             ULONG TypeMask,
+                                                             ULONGLONG ConditionMask);
+
     /// IsWindows8OrGreater() implementation using RtlVerifyVersionInfo
     static bool IsWindows8OrGreater ()
     {
@@ -172,11 +174,58 @@ namespace
         CHECKED (WinRT::RoActivateInstance (classId, &inspectable));
         return inspectable.As (&instance);
     }
+
+    // RAII-ish wrapper for HKEYs
+    class HKEYWrapper
+    {
+        HKEY key;
+        void Close ()
+        {
+            if (key)
+            {
+                RegCloseKey (key);
+                key = NULL;
+            }
+        }
+    public:
+        HKEYWrapper() : key (NULL) {}
+        ~HKEYWrapper () { Close (); }
+
+        operator HKEY const() { return key; }
+        HKEY* operator&() { return &key; }
+    };
+}
+
+static inline RGBA MakeRGBA (uint8_t R, uint8_t G, uint8_t B, uint8_t A)
+{
+    return RGB (R, G, B) | (A << 24);
+}
+
+static inline RGBA MakeOpaque (RGBA base)
+{
+    return base | 0xff000000;
+}
+
+static inline uint8_t GetAValue (RGBA rgba)
+{
+    return (rgba >> 24) & 0xff;
+}
+
+static RGBA BlendRGBA (RGBA a, RGBA b, float f)
+{
+  float a_factor = 1.f - f;
+  float b_factor = f;
+  BYTE alpha_a = GetAValue (a);
+  BYTE alpha_b = GetAValue (b);
+  return MakeRGBA (static_cast<int> (GetRValue (a) * a_factor + GetRValue (b) * b_factor),
+                   static_cast<int> (GetGValue (a) * a_factor + GetGValue (b) * b_factor),
+                   static_cast<int> (GetBValue (a) * a_factor + GetBValue (b) * b_factor),
+                   static_cast<int> (alpha_a * a_factor + alpha_b * b_factor));
 }
 
 static inline RGBA ToRGBA (WindowsUI::Color color)
 {
-    return RGB (color.R, color.G, color.B) | ((color.A) << 24);
+    return MakeRGBA (color.R, color.G, color.B, color.A);
 }
 
 static HRESULT GetAccentColor_win10 (AccentColor& color)
@@ -214,12 +263,6 @@ static HRESULT GetAccentColor_win10 (AccentColor& color)
 #endif
 }
 
-struct DwmColors
-{
-    RGBA ColorizationColor;
-    int ColorizationColorBalance;
-};
-
 template<typename T>
 static LONG QueryFromDWORD (HKEY key, const wchar_t* value, T& dest)
 {
@@ -232,6 +275,12 @@ static LONG QueryFromDWORD (HKEY key, const wchar_t* value, T& dest)
     }
     return result;
 }
+
+struct DwmColors
+{
+    RGBA ColorizationColor;
+    int ColorizationColorBalance;
+};
 
 /* Obtain DWM colors from Registry, via undocumented keys.
    Although there's also an API to get these, it's undocumented as well... */
@@ -246,7 +295,7 @@ static HRESULT GetDwmColors (DwmColors& colors)
             return E_FAIL;
     }
 
-    HKEY keyDWM;
+    HKEYWrapper keyDWM;
     LONG result = RegOpenKeyExW (HKEY_CURRENT_USER, L"SOFTWARE\\Microsoft\\Windows\\DWM", 0, KEY_READ, &keyDWM);
     if (result != ERROR_SUCCESS) return HRESULT_FROM_WIN32 (result);
 
@@ -257,8 +306,7 @@ static HRESULT GetDwmColors (DwmColors& colors)
     {
         // Stored in the registry as BGRA
         colors.ColorizationColor =
-            RGB ((c >> 16) & 0xff, (c >> 8) & 0xff, c & 0xff)
-            | (c & (0xff << 24));
+            MakeRGBA ((c >> 16) & 0xff, (c >> 8) & 0xff, c & 0xff, (c >> 24) & 0xff);
     }
     else
     {
@@ -267,7 +315,6 @@ static HRESULT GetDwmColors (DwmColors& colors)
     result = QueryFromDWORD (keyDWM, L"ColorizationColorBalance", colors.ColorizationColorBalance);
     if (result != ERROR_SUCCESS) hr = HRESULT_FROM_WIN32 (result);
 
-    RegCloseKey (keyDWM);
     return hr;
 }
 
@@ -382,9 +429,10 @@ namespace
             break;
         }
         int minComp = color.V - chroma;
-        return RGB (std::min (((R + minComp) * 255) / 0x8000, 255),
-                    std::min (((G + minComp) * 255) / 0x8000, 255),
-                    std::min (((B + minComp) * 255) / 0x8000, 255)) | (alpha << 24);
+        return MakeRGBA (std::min (((R + minComp) * 255) / 0x8000, 255),
+                         std::min (((G + minComp) * 255) / 0x8000, 255),
+                         std::min (((B + minComp) * 255) / 0x8000, 255),
+                         alpha);
     }
 }
 
@@ -396,30 +444,18 @@ static void GenerateAccentColors (RGBA base, AccentColor& color)
     HSV colorHSV = RGBtoHSV (base);
 
     HSV light = Lighter (colorHSV, colorHSV);
-    color.light = HSVtoRGB (light, (base >> 24) & 0xff);
+    color.light = HSVtoRGB (light, GetAValue (base));
     light = Lighter (light, colorHSV);
-    color.lighter = HSVtoRGB (light, (base >> 24) & 0xff);
+    color.lighter = HSVtoRGB (light, GetAValue (base));
     light = Lighter (light, colorHSV);
-    color.lightest = HSVtoRGB (light, (base >> 24) & 0xff);
+    color.lightest = HSVtoRGB (light, GetAValue (base));
 
     HSV dark = Darker (colorHSV, colorHSV);
-    color.dark = HSVtoRGB (dark, (base >> 24) & 0xff);
+    color.dark = HSVtoRGB (dark, GetAValue (base));
     dark = Darker (dark, colorHSV);
-    color.darker = HSVtoRGB (dark, (base >> 24) & 0xff);
+    color.darker = HSVtoRGB (dark, GetAValue (base));
     dark = Darker (dark, colorHSV);
-    color.darkest = HSVtoRGB (dark, (base >> 24) & 0xff);
-}
-
-static RGBA BlendRGBA (RGBA a, RGBA b, float f)
-{
-  float a_factor = 1.f - f;
-  float b_factor = f;
-  BYTE alpha_a = (a >> 24) & 0xff;
-  BYTE alpha_b = (b >> 24) & 0xff;
-  return RGB (static_cast<int> (GetRValue (a)* a_factor + GetRValue (b)*b_factor),
-              static_cast<int> (GetGValue (a)* a_factor + GetGValue (b)*b_factor),
-              static_cast<int> (GetBValue (a)* a_factor + GetBValue (b)*b_factor))
-    | (static_cast<int> (alpha_a* a_factor + alpha_b*b_factor) << 24);
+    color.darkest = HSVtoRGB (dark, GetAValue (base));
 }
 
 static HRESULT GetAccentColor_dwm (RGBA& color)
@@ -427,9 +463,10 @@ static HRESULT GetAccentColor_dwm (RGBA& color)
     DwmColors dwmColor;
     CHECKED (GetDwmColors (dwmColor));
 
+    // Compose color against background
     color =
-        BlendRGBA (0xffffffff, dwmColor.ColorizationColor | 0xff000000,
-                    (dwmColor.ColorizationColor >> 24) / 255.0f);
+        BlendRGBA (0xffffffff, MakeOpaque (dwmColor.ColorizationColor),
+                   GetAValue (dwmColor.ColorizationColor) / 255.0f);
     return S_OK;
 }
 
@@ -460,49 +497,26 @@ HRESULT GetAccentColor (AccentColor& color)
         color.lightest =
         color.dark =
         color.darker =
-        color.darkest = GetSysColor (COLOR_HIGHLIGHT) | 0xff000000;
+        color.darkest = MakeOpaque (GetSysColor (COLOR_HIGHLIGHT));
     }
     else
     {
-        GenerateAccentColors (GetSysColor (COLOR_ACTIVECAPTION) | 0xff000000, color);
+        GenerateAccentColors (MakeOpaque (GetSysColor (COLOR_ACTIVECAPTION)), color);
     }
     return S_ACCENT_COLOR_GUESSED;
 }
 
 static HRESULT GetSystemFrameColors (FrameColors& color)
 {
-    color.activeCaptionBG = GetSysColor (COLOR_ACTIVECAPTION) | 0xff000000;
-    color.activeCaptionText = GetSysColor (COLOR_CAPTIONTEXT) | 0xff000000;
-    color.activeFrame = GetSysColor (COLOR_CAPTIONTEXT) | 0xff000000;
-    color.inactiveCaptionBG = GetSysColor (COLOR_INACTIVECAPTION) | 0xff000000;
-    RGBA rawInactiveCaptionText = GetSysColor (COLOR_INACTIVECAPTIONTEXT) | 0xff000000;
-    color.inactiveFrame = GetSysColor (COLOR_INACTIVECAPTIONTEXT) | 0xff000000;
+    color.activeCaptionBG = MakeOpaque (GetSysColor (COLOR_ACTIVECAPTION));
+    color.activeCaptionText = MakeOpaque (GetSysColor (COLOR_CAPTIONTEXT));
+    color.activeFrame = MakeOpaque (GetSysColor (COLOR_CAPTIONTEXT));
+    color.inactiveCaptionBG = MakeOpaque (GetSysColor (COLOR_INACTIVECAPTION));
+    RGBA rawInactiveCaptionText = MakeOpaque (GetSysColor (COLOR_INACTIVECAPTIONTEXT));
+    color.inactiveFrame = MakeOpaque (GetSysColor (COLOR_INACTIVECAPTIONTEXT));
     color.inactiveCaptionText = BlendRGBA (rawInactiveCaptionText, color.inactiveCaptionBG, 0.6f);
 
     return S_OK;
-}
-
-namespace
-{
-    // RAII-ish wrapper for HKEYs
-    class HKEYWrapper
-    {
-        HKEY key;
-        void Close ()
-        {
-            if (key)
-            {
-                RegCloseKey (key);
-                key = NULL;
-            }
-        }
-    public:
-        HKEYWrapper() : key (NULL) {}
-        ~HKEYWrapper () { Close (); }
-
-        operator HKEY const() { return key; }
-        HKEY* operator&() { return &key; }
-    };
 }
 
 // Returns whether title bars are colored with the accent color (Windows 10)
@@ -591,8 +605,8 @@ static HRESULT GetAccentedFrameColors (FrameColors& color, unsigned int options)
             const RGBA activeFrameBaseColor = 0xffd9d9d9;
             // Frame color is based on DWM colors, though those usually coincide or are based on the accent color
             color.activeFrame = BlendRGBA (activeFrameBaseColor,
-                                            dwmColors.ColorizationColor | 0xff000000,
-                                            dwmColors.ColorizationColorBalance * 0.01f);
+                                           MakeOpaque (dwmColors.ColorizationColor),
+                                           dwmColors.ColorizationColorBalance * 0.01f);
         }
         else
         {
