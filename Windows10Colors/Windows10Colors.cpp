@@ -425,8 +425,7 @@ static RGBA BlendRGBA (RGBA a, RGBA b, float f)
 static HRESULT GetAccentColor_dwm (RGBA& color)
 {
     DwmColors dwmColor;
-    HRESULT hr = GetDwmColors (dwmColor);
-    if (FAILED (hr)) return hr;
+    CHECKED (GetDwmColors (dwmColor));
 
     color =
         BlendRGBA (0xffffffff, dwmColor.ColorizationColor | 0xff000000,
@@ -560,15 +559,12 @@ static HRESULT GetAccentColorOnly (RGBA& color)
 
 static HRESULT GetAccentedFrameColors (FrameColors& color, unsigned int options)
 {
-    HRESULT hr;
-
     bool isWin10 = IsWindows10OrGreater ();
     bool glassEffect = (options & fcGlassEffect) != 0;
     bool useAccentColor = !isWin10 || ((options & fcTitleBarsColored) != 0)
         || (!glassEffect && ColoredTitleBars());
     RGBA accent;
-    hr = GetAccentColorOnly (accent);
-    if (FAILED (hr)) return hr;
+    CHECKED (GetAccentColorOnly (accent));
 
     if (useAccentColor)
     {
