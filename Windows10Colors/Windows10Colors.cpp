@@ -24,7 +24,9 @@ https://github.com/res2k/Windows10Colors
 
 */
 
+#ifndef NOMINMAX
 #define NOMINMAX
+#endif // NOMINMAX
 #include "Windows10Colors.h"
 
 #include <comdef.h>
