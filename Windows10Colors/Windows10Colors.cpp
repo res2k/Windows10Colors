@@ -68,7 +68,7 @@ namespace
       return RtlVerifyVersionInfo (&version, VER_MAJORVERSION | VER_MINORVERSION, conditionMask) == 0;
     }
 
-    /// IsWindows8OrGreater() implementation using RtlVerifyVersionInfo
+    /// IsWindows10OrGreater() implementation using RtlVerifyVersionInfo
     static bool IsWindows10OrGreater ()
     {
       RTL_OSVERSIONINFOEXW version = { sizeof (RTL_OSVERSIONINFOEXW), 10, 0 };
@@ -76,6 +76,16 @@ namespace
       VER_SET_CONDITION (conditionMask, VER_MAJORVERSION, VER_GREATER_EQUAL);
       VER_SET_CONDITION (conditionMask, VER_MINORVERSION, VER_GREATER_EQUAL);
       return RtlVerifyVersionInfo (&version, VER_MAJORVERSION | VER_MINORVERSION, conditionMask) == 0;
+    }
+
+    static bool IsWindows10_1809OrGreater ()
+    {
+      RTL_OSVERSIONINFOEXW version = { sizeof (RTL_OSVERSIONINFOEXW), 10, 0, 17763 };
+      ULONGLONG conditionMask = 0;
+      VER_SET_CONDITION (conditionMask, VER_MAJORVERSION, VER_GREATER_EQUAL);
+      VER_SET_CONDITION (conditionMask, VER_MINORVERSION, VER_GREATER_EQUAL);
+      VER_SET_CONDITION (conditionMask, VER_BUILDNUMBER, VER_GREATER_EQUAL);
+      return RtlVerifyVersionInfo (&version, VER_MAJORVERSION | VER_MINORVERSION | VER_BUILDNUMBER, conditionMask) == 0;
     }
 
     /// Wrapper for the few WinRT functions we need to use
@@ -613,6 +623,12 @@ static HRESULT GetAccentedFrameColors (FrameColors& color, unsigned int options,
     if (glassEffect)
     {
         color.activeFrame = color.activeCaptionBG;
+    }
+    else if (IsWindows10_1809OrGreater () && !useAccentColor)
+    {
+        /* After Windows 10, v1809 the frame color is controlled by the colored title bars option as well;
+         * it's not based on the DWM ColorizationColor if colored title bars are off */
+        color.activeFrame = 0xb2323232;
     }
     else
     {
