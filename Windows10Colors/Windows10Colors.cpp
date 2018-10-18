@@ -573,7 +573,7 @@ static HRESULT GetAccentColorOnly (RGBA& color)
     return S_ACCENT_COLOR_GUESSED;
 }
 
-static HRESULT GetAccentedFrameColors (FrameColors& color, unsigned int options)
+static HRESULT GetAccentedFrameColors (FrameColors& color, unsigned int options, DarkMode darkMode)
 {
     bool isWin10 = IsWindows10OrGreater ();
     bool glassEffect = (options & fcGlassEffect) != 0;
@@ -581,19 +581,34 @@ static HRESULT GetAccentedFrameColors (FrameColors& color, unsigned int options)
         || (!glassEffect && ColoredTitleBars());
     RGBA accent;
     CHECKED (GetAccentColorOnly (accent));
-
+    bool isDarkMode;
+    if (darkMode == DarkMode::Auto)
+    {
+        GetDarkModeEnabled (isDarkMode);
+    }
+    else
+    {
+        isDarkMode = darkMode == DarkMode::Dark;
+    }
     if (useAccentColor)
     {
         color.activeCaptionBG = accent;
     }
     else
     {
-        color.activeCaptionBG = 0xffffffff;
+        color.activeCaptionBG = isDarkMode ? 0xff000000 : 0xffffffff;
     }
 
+    auto DefaultCaptionText =
+        [](RGBA bg)
+        {
+            // Formula is documented here: https://docs.microsoft.com/en-us/windows/uwp/design/style/color
+            bool textIsBright = IsColorDark (bg);
+            return textIsBright ? 0xffffffff : 0xff000000; // Colors seem static
+        };
+
     // Formula is documented here: https://docs.microsoft.com/en-us/windows/uwp/design/style/color
-    bool textIsBright = IsColorDark (color.activeCaptionBG);
-    color.activeCaptionText = textIsBright ? 0xffffffff : 0xff000000; // Colors seem static
+    color.activeCaptionText = DefaultCaptionText (color.activeCaptionBG);
 
     if (glassEffect)
     {
@@ -617,23 +632,24 @@ static HRESULT GetAccentedFrameColors (FrameColors& color, unsigned int options)
         }
     }
 
-    color.inactiveCaptionBG = 0xffffffff;
-    RGBA rawInactiveCaptionText = 0xff000000;
+    color.inactiveCaptionBG = isDarkMode ? 0xff2b2b2b : 0xffffffff;
+    RGBA rawInactiveCaptionText = DefaultCaptionText (color.inactiveCaptionBG);
     // inactive frame: Probably a 0.5 blend of 0xffaaaaaa and 0. Maybe 0xffaaaaaa is itself a blend.
     color.inactiveFrame = 0x7f565656;
-    color.inactiveCaptionText = BlendRGBA (rawInactiveCaptionText, color.inactiveCaptionBG, 0.6f);
+    color.inactiveCaptionText = BlendRGBA (rawInactiveCaptionText, color.inactiveCaptionBG, isDarkMode ? 0.4f : 0.6f);
+    // dark mode goal: 0xffaaaaaa
 
     return S_OK;
 }
 
-HRESULT GetFrameColors (FrameColors& color, unsigned int options)
+HRESULT GetFrameColors (FrameColors& color, unsigned int options, DarkMode darkMode)
 {
     // High contrast colors -> use GetSysColors
     bool use_sys_colors = IsHighContrast ();
 
     if (!use_sys_colors)
     {
-        HRESULT hr = GetAccentedFrameColors (color, options);
+        HRESULT hr = GetAccentedFrameColors (color, options, darkMode);
         if (SUCCEEDED (hr)) return hr;
     }
 

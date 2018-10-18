@@ -110,14 +110,28 @@ namespace windows10colors
         fcTitleBarsColored = 2
     };
 
+    /// Dark mode colors selections
+    enum struct DarkMode
+    {
+        /// Use user setting for Dark Mode
+        Auto,
+        /// Use light mode
+        Light,
+        /// Use dark mode
+        Dark
+    };
+
     /**
      * Get colors used to paint window frames.
      * \param color Receives frame color values.
      * \param options Frame color options. Combination of FrameColorOption values.
+     * \param darkMode Whether to use Dark Mode colors. Note: Defaults to "Light"
+     *   as the applications would need to account for this in various places.
      * \remarks On platforms other than Windows 10 tries to guess appropriate
      *   colors. Returns \c S_ACCENT_COLOR_GUESSED in that case.
      */
-    extern HRESULT GetFrameColors (FrameColors& color, unsigned int options = fcDefault);
+    extern HRESULT GetFrameColors (FrameColors& color, unsigned int options = fcDefault,
+                                   DarkMode darkMode = DarkMode::Light);
 
     /**
      * Returns whether some color is 'dark' for the purpose of finding a contrasting

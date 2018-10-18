@@ -26,8 +26,8 @@ windows10colors::FrameColors colorsGlass;
 static void UpdateWindows10Colors ()
 {
     accents_valid = SUCCEEDED (windows10colors::GetAccentColor (accents));
-    windows10colors::GetFrameColors (colors);
-    windows10colors::GetFrameColors (colorsGlass, windows10colors::fcGlassEffect);
+    windows10colors::GetFrameColors (colors, windows10colors::fcDefault, windows10colors::DarkMode::Auto);
+    windows10colors::GetFrameColors (colorsGlass, windows10colors::fcGlassEffect, windows10colors::DarkMode::Auto);
 }
 
 // Forward declarations of functions included in this code module:
