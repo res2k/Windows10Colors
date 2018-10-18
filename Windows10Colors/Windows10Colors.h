@@ -129,6 +129,9 @@ namespace windows10colors
     {
       return (GetRValue (color) * 2 + GetGValue (color) * 5 + GetBValue (color)) <= 1024;
     }
+
+    /// Determines whether "Dark Mode" is enabled
+    extern HRESULT GetDarkModeEnabled (bool& darkMode);
 } // namespace windows10colors
 
 #endif // __WINDOWS10COLORS_H__

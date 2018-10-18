@@ -640,4 +640,27 @@ HRESULT GetFrameColors (FrameColors& color, unsigned int options)
     return GetSystemFrameColors (color);
 }
 
+HRESULT GetDarkModeEnabled (bool& darkMode)
+{
+    darkMode = false; // Default: Disabled
+
+    HKEYWrapper keyPersonalize;
+    LONG result = RegOpenKeyExW (HKEY_CURRENT_USER, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", 0, KEY_READ, &keyPersonalize);
+    if (result != ERROR_SUCCESS) return HRESULT_FROM_WIN32 (result);
+
+    HRESULT hr = S_OK;
+    DWORD flag;
+    result = QueryFromDWORD (keyPersonalize, L"AppsUseLightTheme", flag);
+    if (result == ERROR_SUCCESS)
+    {
+        darkMode = flag == 0;
+    }
+    else
+    {
+        hr = HRESULT_FROM_WIN32 (result);
+    }
+
+    return hr;
+}
+
 } // namespace windows10colors
