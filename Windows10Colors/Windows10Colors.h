@@ -94,6 +94,8 @@ namespace windows10colors
     /// Frame color options
     enum FrameColorOption
     {
+        /// Default frame colors
+        fcDefault = 0,
         /**
          * Whether to compute colors for a window with an enabled "sheet of glass" effect.
          * This is the case if blur behind was enabled for a window with a valid opaque
@@ -115,7 +117,7 @@ namespace windows10colors
      * \remarks On platforms other than Windows 10 tries to guess appropriate
      *   colors. Returns \c S_ACCENT_COLOR_GUESSED in that case.
      */
-    extern HRESULT GetFrameColors (FrameColors& color, unsigned int options = 0);
+    extern HRESULT GetFrameColors (FrameColors& color, unsigned int options = fcDefault);
 
     /**
      * Returns whether some color is 'dark' for the purpose of finding a contrasting
