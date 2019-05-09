@@ -302,6 +302,8 @@ struct DwmColors
 {
     RGBA ColorizationColor;
     int ColorizationColorBalance;
+    bool haveAccentColor;
+    RGBA AccentColor;
 };
 
 /* Obtain DWM colors from Registry, via undocumented keys.
@@ -336,6 +338,9 @@ static HRESULT GetDwmColors (DwmColors& colors)
     }
     result = QueryFromDWORD (keyDWM, L"ColorizationColorBalance", colors.ColorizationColorBalance);
     if (result != ERROR_SUCCESS) hr = HRESULT_FROM_WIN32 (result);
+
+    result = QueryFromDWORD (keyDWM, L"AccentColor", colors.AccentColor);
+    colors.haveAccentColor = result == ERROR_SUCCESS;
 
     return hr;
 }
@@ -620,8 +625,22 @@ static HRESULT GetAccentedFrameColors (FrameColors& color, unsigned int options,
     bool glassEffect = (options & fcGlassEffect) != 0;
     bool useAccentColor = !isWin10 || ((options & fcTitleBarsColored) != 0)
         || (!glassEffect && ColoredTitleBars());
+
+    DwmColors dwmColors;
+    bool haveDwmColors = SUCCEEDED (GetDwmColors(dwmColors));
+
     RGBA accent;
-    CHECKED (GetAccentColorOnly (accent));
+    if (haveDwmColors && dwmColors.haveAccentColor)
+    {
+        /* Prefer AccentColor from registry, if present, as that typically matches the actual
+         * title bar color */
+        accent = dwmColors.AccentColor;
+    }
+    else
+    {
+        CHECKED (GetAccentColorOnly (accent));
+    }
+
     bool isDarkMode = ResolveDarkMode (darkMode);
     if (useAccentColor)
     {
@@ -655,14 +674,21 @@ static HRESULT GetAccentedFrameColors (FrameColors& color, unsigned int options,
     }
     else
     {
-        DwmColors dwmColors;
-        if (SUCCEEDED (GetDwmColors (dwmColors)))
+        if (haveDwmColors)
         {
             const RGBA activeFrameBaseColor = 0xffd9d9d9;
             // Frame color is based on DWM colors, though those usually coincide or are based on the accent color
-            color.activeFrame = BlendRGBA (activeFrameBaseColor,
-                                           MakeOpaque (dwmColors.ColorizationColor),
-                                           dwmColors.ColorizationColorBalance * 0.01f);
+            if (dwmColors.ColorizationColorBalance >= 0)
+            {
+                color.activeFrame = BlendRGBA (activeFrameBaseColor,
+                                               MakeOpaque (dwmColors.ColorizationColor),
+                                               dwmColors.ColorizationColorBalance * 0.01f);
+            }
+            else
+            {
+                // Not sure, but matches observation
+                color.activeFrame = accent;
+            }
         }
         else
         {
