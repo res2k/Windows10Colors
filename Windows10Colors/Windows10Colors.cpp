@@ -88,6 +88,16 @@ namespace
       return RtlVerifyVersionInfo (&version, VER_MAJORVERSION | VER_MINORVERSION | VER_BUILDNUMBER, conditionMask) == 0;
     }
 
+    static bool IsWindows10_1903OrGreater ()
+    {
+        RTL_OSVERSIONINFOEXW version = { sizeof (RTL_OSVERSIONINFOEXW), 10, 0, 18362 };
+        ULONGLONG conditionMask = 0;
+        VER_SET_CONDITION (conditionMask, VER_MAJORVERSION, VER_GREATER_EQUAL);
+        VER_SET_CONDITION (conditionMask, VER_MINORVERSION, VER_GREATER_EQUAL);
+        VER_SET_CONDITION (conditionMask, VER_BUILDNUMBER, VER_GREATER_EQUAL);
+        return RtlVerifyVersionInfo (&version, VER_MAJORVERSION | VER_MINORVERSION | VER_BUILDNUMBER, conditionMask) == 0;
+    }
+
     /// Wrapper for the few WinRT functions we need to use
     class WinRT
     {
@@ -583,6 +593,27 @@ static HRESULT GetAccentColorOnly (RGBA& color)
     return S_ACCENT_COLOR_GUESSED;
 }
 
+static bool ResolveDarkMode (DarkMode darkMode)
+{
+    bool isDarkMode;
+    if (darkMode == DarkMode::Auto)
+    {
+        /* Although the Dark Mode Apps setting was introduced in Win10 1809,
+         * only in 1903 the Explorer as a Win32 app started to consider it.
+         * Go with that. */
+        darkMode = IsWindows10_1903OrGreater () ? DarkMode::User : DarkMode::Light;
+    }
+    if (darkMode == DarkMode::User)
+    {
+        GetDarkModeEnabled (isDarkMode);
+    }
+    else
+    {
+        isDarkMode = darkMode == DarkMode::Dark;
+    }
+    return isDarkMode;
+}
+
 static HRESULT GetAccentedFrameColors (FrameColors& color, unsigned int options, DarkMode darkMode)
 {
     bool isWin10 = IsWindows10OrGreater ();
@@ -591,15 +622,7 @@ static HRESULT GetAccentedFrameColors (FrameColors& color, unsigned int options,
         || (!glassEffect && ColoredTitleBars());
     RGBA accent;
     CHECKED (GetAccentColorOnly (accent));
-    bool isDarkMode;
-    if (darkMode == DarkMode::Auto)
-    {
-        GetDarkModeEnabled (isDarkMode);
-    }
-    else
-    {
-        isDarkMode = darkMode == DarkMode::Dark;
-    }
+    bool isDarkMode = ResolveDarkMode (darkMode);
     if (useAccentColor)
     {
         color.activeCaptionBG = accent;

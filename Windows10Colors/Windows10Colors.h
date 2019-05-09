@@ -113,8 +113,13 @@ namespace windows10colors
     /// Dark mode colors selections
     enum struct DarkMode
     {
-        /// Use user setting for Dark Mode
+        /**
+         * Choose dark mode depending on Windows version:
+         * User on Windows 1903 and newer, Light otherwise.
+         */
         Auto,
+        /// Use user setting for Dark Mode
+        User,
         /// Use light mode
         Light,
         /// Use dark mode
@@ -131,7 +136,7 @@ namespace windows10colors
      *   colors. Returns \c S_ACCENT_COLOR_GUESSED in that case.
      */
     extern HRESULT GetFrameColors (FrameColors& color, unsigned int options = fcDefault,
-                                   DarkMode darkMode = DarkMode::Light);
+                                   DarkMode darkMode = DarkMode::Auto);
 
     /**
      * Returns whether some color is 'dark' for the purpose of finding a contrasting
