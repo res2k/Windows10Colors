@@ -22,10 +22,13 @@ To use the `Windows10Colors` functions copy the source files into your project.
 
 ### Requirements
 * Build time: Requires Windows 10 SDK.
-  You can use the Windows 8.1 SDK, but it will not produce sensible results at runtime.
-* Run time: Only produces sensible results on Windows 10.
-  You should choose different code paths or colors on earlier versions.
-* Compiler: So far only tested with Visual Studio 2015.
+  You can use the Windows 8.1 SDK, but you'll not be able to get the actual accent color on Windows 10
+  systems.
+* Run time: The real accent color can only be obtained on Windows 10.
+  On older Windows versions (7, 8, 8.1) the "accent color" will be derived from the
+  user-configured title bar color.
+  If you don't want this behaviour you should choose different code paths or colors on earlier versions.
+* Compiler: So far only tested with Visual Studio 2015 and above.
 
 ## Implementation Details
 Uses a WinRT API (`Windows.UI.ViewManagement.UISettings3`) to obtain the accent color. However, since
