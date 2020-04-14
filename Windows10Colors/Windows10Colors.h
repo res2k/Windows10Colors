@@ -138,7 +138,7 @@ namespace windows10colors
      *   colors. Returns \c S_ACCENT_COLOR_GUESSED in that case.
      */
     extern HRESULT GetFrameColors (FrameColors& color, unsigned int options = fcDefault,
-                                   DarkMode darkMode = DarkMode::Auto);
+                                   DarkMode darkMode = DarkMode::Light);
 
     /**
      * Returns whether some color is 'dark' for the purpose of finding a contrasting
