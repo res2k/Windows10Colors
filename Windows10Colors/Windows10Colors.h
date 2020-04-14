@@ -132,6 +132,8 @@ namespace windows10colors
      * \param options Frame color options. Combination of FrameColorOption values.
      * \param darkMode Whether to use Dark Mode colors. Note: Defaults to "Light"
      *   as the applications would need to account for this in various places.
+     *   If you're application is dark-mode aware you can use "Auto" or an appropriate
+     *   explicit setting.
      * \remarks On platforms other than Windows 10 tries to guess appropriate
      *   colors. Returns \c S_ACCENT_COLOR_GUESSED in that case.
      */
