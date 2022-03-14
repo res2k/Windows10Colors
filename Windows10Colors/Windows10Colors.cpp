@@ -610,7 +610,7 @@ static bool ResolveDarkMode (DarkMode darkMode)
     }
     if (darkMode == DarkMode::User)
     {
-        GetDarkModeEnabled (isDarkMode);
+        GetAppDarkModeEnabled (isDarkMode);
     }
     else
     {
@@ -721,7 +721,7 @@ HRESULT GetFrameColors (FrameColors& color, unsigned int options, DarkMode darkM
     return GetSystemFrameColors (color);
 }
 
-HRESULT GetDarkModeEnabled (bool& darkMode)
+HRESULT GetAppDarkModeEnabled (bool& darkMode)
 {
     darkMode = false; // Default: Disabled
 

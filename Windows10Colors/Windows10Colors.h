@@ -32,6 +32,14 @@ https://github.com/res2k/Windows10Colors
 
 #include <Windows.h>
 
+#if (__cplusplus >= 201402L)
+#define W10C_DEPRECATED(msg)	[[deprecated(msg)]]
+#elif defined(_MSC_VER)
+#define W10C_DEPRECATED(msg)	__declspec(deprecated(msg))
+#else
+#define W10C_DEPRECATED(msg)
+#endif
+
 namespace windows10colors
 {
     static const HRESULT S_ACCENT_COLOR_GUESSED = MAKE_HRESULT (0, 0x457, 0xC);
@@ -151,9 +159,17 @@ namespace windows10colors
       return (GetRValue (color) * 2 + GetGValue (color) * 5 + GetBValue (color)) <= 1024;
     }
 
-    /// Determines whether "Dark Mode" is enabled
-    extern HRESULT GetDarkModeEnabled (bool& darkMode);
+    /// Determines whether "Dark Mode" is enabled for apps
+    extern HRESULT GetAppDarkModeEnabled (bool& darkMode);
+    // Compatibility name
+    W10C_DEPRECATED ("Please use GetAppDarkModeEnabled() instead")
+    static inline HRESULT GetDarkModeEnabled (bool& darkMode)
+    {
+        return GetAppDarkModeEnabled (darkMode);
+    }
 } // namespace windows10colors
+
+#undef W10C_DEPRECATED
 
 #endif // __WINDOWS10COLORS_H__
 
