@@ -750,4 +750,31 @@ HRESULT GetAppDarkModeEnabled (bool& darkMode)
     return hr;
 }
 
+HRESULT GetSysPartsDarkModeEnabled (bool& darkMode)
+{
+    bool sysLight = true; // Default: light mode
+    HRESULT hr = GetThemePersonalizeFlag (sysLight, L"SystemUsesLightTheme");
+    darkMode = !sysLight;
+    return hr;
+}
+
+HRESULT GetSysPartsMode (SysPartsMode& mode)
+{
+    mode = SysPartsMode::Dark;
+
+    bool themedSysParts = false;
+    HRESULT hr = GetThemePersonalizeFlag(themedSysParts, L"ColorPrevalence");
+    if(SUCCEEDED(hr) && themedSysParts)
+    {
+        mode = SysPartsMode::AccentColor;
+        return hr;
+    }
+
+    bool sysDarkMode;
+    hr = GetSysPartsDarkModeEnabled(sysDarkMode);
+    if(SUCCEEDED(hr))
+        mode = sysDarkMode ? SysPartsMode::Dark : SysPartsMode::Light;
+    return hr;
+}
+
 } // namespace windows10colors

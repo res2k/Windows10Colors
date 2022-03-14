@@ -167,6 +167,27 @@ namespace windows10colors
     {
         return GetAppDarkModeEnabled (darkMode);
     }
+
+    /**
+     * Determines whether "Dark Mode" is default for system parts (start menu, taskbar).
+     * "Default Windows mode", however "Show accent color" is a separate setting.
+     * GetSysPartsMode() will also consider the latter.
+     */
+    extern HRESULT GetSysPartsDarkModeEnabled (bool& darkMode);
+
+    /// Mode (colorization) of system parts (start menu, taskbar).
+    enum struct SysPartsMode
+    {
+        /// Accent color is used
+        AccentColor,
+        /// Dark mode is used
+        Dark,
+        /// Light mode is used
+        Light
+    };
+    /// Get mode (colorization) of system parts (start menu, taskbar).
+    extern HRESULT GetSysPartsMode (SysPartsMode& mode);
+
 } // namespace windows10colors
 
 #undef W10C_DEPRECATED
