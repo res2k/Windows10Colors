@@ -721,26 +721,32 @@ HRESULT GetFrameColors (FrameColors& color, unsigned int options, DarkMode darkM
     return GetSystemFrameColors (color);
 }
 
-HRESULT GetAppDarkModeEnabled (bool& darkMode)
+static HRESULT GetThemePersonalizeFlag (bool& resultFlag, const wchar_t* key)
 {
-    darkMode = false; // Default: Disabled
-
     HKEYWrapper keyPersonalize;
     LONG result = RegOpenKeyExW (HKEY_CURRENT_USER, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", 0, KEY_READ, &keyPersonalize);
     if (result != ERROR_SUCCESS) return HRESULT_FROM_WIN32 (result);
 
     HRESULT hr = S_OK;
     DWORD flag;
-    result = QueryFromDWORD (keyPersonalize, L"AppsUseLightTheme", flag);
+    result = QueryFromDWORD (keyPersonalize, key, flag);
     if (result == ERROR_SUCCESS)
     {
-        darkMode = flag == 0;
+        resultFlag = flag != 0;
     }
     else
     {
         hr = HRESULT_FROM_WIN32 (result);
     }
 
+    return hr;
+}
+
+HRESULT GetAppDarkModeEnabled (bool& darkMode)
+{
+    bool appsLight = true; // Default: light mode
+    HRESULT hr = GetThemePersonalizeFlag (appsLight, L"AppsUseLightTheme");
+    darkMode = !appsLight;
     return hr;
 }
 
