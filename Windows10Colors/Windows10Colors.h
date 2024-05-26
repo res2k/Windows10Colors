@@ -152,7 +152,7 @@ namespace windows10colors
      * Returns whether some color is 'dark' for the purpose of finding a contrasting
      * color - e.g. given some background color, use the 'dark' property to choose
      * an appropriate text (foreground) color.
-     * Formula matches the one in https://docs.microsoft.com/en-us/windows/uwp/design/style/color
+     * Formula matches the one in https://learn.microsoft.com/en-us/windows/apps/desktop/modernize/apply-windows-themes
      */
     static inline bool IsColorDark (RGBA color)
     {

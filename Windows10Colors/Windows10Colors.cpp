@@ -654,12 +654,10 @@ static HRESULT GetAccentedFrameColors (FrameColors& color, unsigned int options,
     auto DefaultCaptionText =
         [](RGBA bg)
         {
-            // Formula is documented here: https://docs.microsoft.com/en-us/windows/uwp/design/style/color
             bool textIsBright = IsColorDark (bg);
             return textIsBright ? 0xffffffff : 0xff000000; // Colors seem static
         };
 
-    // Formula is documented here: https://docs.microsoft.com/en-us/windows/uwp/design/style/color
     color.activeCaptionText = DefaultCaptionText (color.activeCaptionBG);
 
     if (glassEffect)
